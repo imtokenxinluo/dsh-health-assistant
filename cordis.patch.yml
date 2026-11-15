@@ -1,0 +1,5 @@
+# dsh-health-assistant bundle patch: mount the health assistant.
+# 提醒逻辑全在客户端（浏览器本地存储），宿主只挂一个空 Service。
+- insert:
+    - id: dsh-health-assistant
+      name: 'dsh-health-assistant'
