@@ -1,6 +1,6 @@
 {
   "name": "dsh-health-assistant",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DSH 插件：健康小助手 —— 定时提醒休息、连续工作劝停、熬夜提醒。完全本地，不联网。",
   "license": "UNLICENSED",
   "type": "module",

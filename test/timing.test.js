@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  DEFAULT_SETTINGS, IDLE_RESET_MIN, freshState, tick, inNightWindow,
+  DEFAULT_SETTINGS, IDLE_RESET_MIN, STALE_RESET_MIN, freshState, tick, inNightWindow,
   formatDuration, snooze, muteToday, takeRest, isMutedToday, dayKey,
 } from '../src/timing.js'
 
@@ -183,5 +183,43 @@ test('background=true 但页面可见时，仍按 idle 重置', () => {
   const bg = { ...S, background: true }
   const st = { ...freshState(T0), activeMin: 10 }
   const r = tick(st, bg, T0 + 15 * MIN, { visible: true, idleMin: 8 })
+  assert.equal(r.state.activeMin, 0)
+})
+
+// ── 隔夜 / 长时间未运行（2026-11-16 用户反馈：开机就提醒休息）────────────────
+test('隔夜再开机：状态清零，不提醒', () => {
+  // 昨天 23:50 还在工作，今天 13:30 开机
+  const lastNight = new Date('2026-11-15T23:50:00+08:00').getTime()
+  const morning = new Date('2026-11-16T13:30:00+08:00').getTime()
+  const stale = { ...freshState(lastNight), activeMin: 28, longSent: [2] }
+  const r = tick(stale, S, morning, { visible: true, idleMin: 0 })
+  assert.equal(r.prompt, null, '开机第一下不该提醒')
+  assert.equal(r.state.activeMin, 0)
+  assert.deepEqual(r.state.longSent, [])
+  assert.equal(r.state.workStart, morning, '连续工作从开机重新算')
+})
+
+test('隔夜后 workStart 重置 → 不会算成「连续工作 13 小时」', () => {
+  const lastNight = new Date('2026-11-15T23:50:00+08:00').getTime()
+  const morning = new Date('2026-11-16T13:30:00+08:00').getTime()
+  const stale = { ...freshState(lastNight), activeMin: 10 }
+  const r = tick(stale, S, morning, { visible: true, idleMin: 0 })
+  const workedHours = (morning - r.state.workStart) / 3600000
+  assert.equal(workedHours, 0)
+})
+
+test('两小时内的小憩：保留状态，不误清零', () => {
+  const t1 = T0
+  const t2 = T0 + 90 * MIN // 1.5 小时前
+  const st = { ...freshState(t1), activeMin: 20, workStart: t1 }
+  const r = tick(st, S, t2, { visible: true, idleMin: 0 })
+  assert.ok(r.state.activeMin >= 20, '90 分钟未超阈值，应保留')
+  assert.equal(r.state.workStart, t1)
+})
+
+test('STALE_RESET_MIN 边界：刚过阈值的状态会被重置', () => {
+  const st = { ...freshState(T0), activeMin: 20 }
+  const justOver = T0 + (STALE_RESET_MIN + 1) * MIN
+  const r = tick(st, S, justOver, { visible: true, idleMin: 0 })
   assert.equal(r.state.activeMin, 0)
 })

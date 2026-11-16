@@ -20,6 +20,8 @@ export const DEFAULT_SETTINGS = {
 }
 
 export const IDLE_RESET_MIN = 5
+// 页面关了/关了机再回来：超过这个时长就当成新的一天，状态清零
+export const STALE_RESET_MIN = 120
 export const TICK_MS = 15000
 
 const MIN = 60000
@@ -105,6 +107,15 @@ function promptFor(kind, ctx) {
 export function tick(state, settings, nowMs, env) {
   const s = { ...settings }
   if (!s.enabled) return { state: { ...state, lastTick: nowMs }, prompt: null }
+
+  // 上次运行是两小时以前（关机 / 关页面 / 隔夜）→ 当成全新的一天：
+  // 专注清零、workStart 重来、长时档位重置。否则第二天一开机会立刻弹"连续工作 x 小时"。
+  if (state.lastTick && nowMs - state.lastTick > STALE_RESET_MIN * MIN) {
+    const clean = freshState(nowMs)
+    clean.snoozeUntil = state.snoozeUntil
+    clean.mutedDay = state.mutedDay
+    return { state: clean, prompt: null }
+  }
 
   // 页面不可见时：除非开了「后台也计时」，否则不累计也不提醒（人在别处）
   const background = !!settings.background && !env.visible
