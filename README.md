@@ -57,5 +57,4 @@ dsh plugin add dsh-health-assistant
 
 ## License
 
-Proprietary — free to install and use with DeepSeek Harness; copying, modifying,
-or redistributing is not permitted.
+MIT — 可以自由使用、修改、分发，包括商业用途。改的时候留个出处就行。

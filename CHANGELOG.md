@@ -1,5 +1,9 @@
 # 变更记录
 
+## 0.1.2 — 2026-11-19
+
+- **改为 MIT 开源许可**（此前是 UNLICENSED）。可以自由使用、修改、分发，包括商业用途。
+- 源码：https://github.com/imtokenxinluo/dsh-health-assistant
 ## 0.1.1 — 2026-11-16
 
 **必更 —— 修「一开机就提醒休息」**
