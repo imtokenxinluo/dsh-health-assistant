@@ -2,7 +2,7 @@
 // Client 半：休息提醒（overlay 浮层）+ 专注计时（composer 下方）+ 设置页。
 // 全部本地运行：不联网、不上报，状态只存在 localStorage。
 
-import { createElement as h, useState, useEffect } from 'react'
+import { createElement as h, useState, useEffect, useRef } from 'react'
 import {
   DEFAULT_SETTINGS, TICK_MS, freshState, tick, formatDuration,
   snooze, muteToday, takeRest, isMutedToday,
@@ -114,7 +114,8 @@ const CSS = [
   'box-shadow:0 12px 32px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.1);font-size:13px;line-height:1.55}',
   '.dha-icon{font-size:20px;line-height:1.2}',
   '.dha-body{flex:1;min-width:0}',
-  '.dha-title{font-weight:700;font-size:14px;margin-bottom:2px}',
+  '.dha-title{font-weight:700;font-size:14px;margin-bottom:2px;display:flex;align-items:baseline;justify-content:space-between;gap:10px}',
+  '.dha-count{font-weight:400;font-size:11px;color:#8a8f98;font-variant-numeric:tabular-nums}',
   '.dha-text{color:#a9b1bd}',
   '.dha-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}',
   '.dha-actions button{font:inherit;font-size:12px;padding:4px 10px;border-radius:8px;cursor:pointer;',
@@ -162,34 +163,64 @@ function fireSystemNotification(title, body) {
 }
 // ── 浮层提醒 ────────────────────────────────────────────────────────────────
 
+const TOAST_AUTO_HIDE_SEC = 20
+
 function HealthToast() {
   const { prompt: p } = useHealthStore()
   useEffect(() => { ensureStyles() }, [])
+
+  const [left, setLeft] = useState(TOAST_AUTO_HIDE_SEC)
+  const hoverRef = useRef(false)
+
+  // 每次出现新提醒：重置倒计时，20 秒后自动收起（鼠标悬停时暂停）
+  useEffect(() => {
+    if (!p) return undefined
+    setLeft(TOAST_AUTO_HIDE_SEC)
+    let remain = TOAST_AUTO_HIDE_SEC
+    const timer = setInterval(() => {
+      if (hoverRef.current) return
+      remain -= 1
+      setLeft(remain)
+      if (remain <= 0) {
+        clearInterval(timer)
+        clearPrompt()
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [p])
+
   if (!p) return null
 
   const icon = p.kind === 'night' ? '🌙' : p.kind === 'long' ? '🪫' : '🧘'
 
-  return h('div', { className: 'dha-toast', role: 'status', 'aria-live': 'polite' },
-    h('div', { className: 'dha-icon' }, icon),
-    h('div', { className: 'dha-body' },
-      h('div', { className: 'dha-title' }, p.title),
-      h('div', { className: 'dha-text' }, p.body),
-      h('div', { className: 'dha-actions' },
-        h('button', {
-          type: 'button',
-          className: 'primary',
-          onClick: () => { state = takeRest(state, Date.now()); clearPrompt() },
-        }, '休息一下'),
-        h('button', {
-          type: 'button',
-          onClick: () => { state = snooze(state, 10, Date.now()); clearPrompt() },
-        }, '10 分钟后再提醒'),
-        h('button', {
-          type: 'button',
-          onClick: () => { state = muteToday(state, Date.now()); clearPrompt() },
-        }, '今天不再提醒'))))
+  return h('div', {
+    className: 'dha-toast',
+    role: 'status',
+    'aria-live': 'polite',
+    onMouseEnter: () => { hoverRef.current = true },
+    onMouseLeave: () => { hoverRef.current = false },
+  },
+  h('div', { className: 'dha-icon' }, icon),
+  h('div', { className: 'dha-body' },
+    h('div', { className: 'dha-title' },
+      p.title,
+      h('span', { className: 'dha-count' }, left > 0 ? left + 's' : '')),
+    h('div', { className: 'dha-text' }, p.body),
+    h('div', { className: 'dha-actions' },
+      h('button', {
+        type: 'button',
+        className: 'primary',
+        onClick: () => { state = takeRest(state, Date.now()); clearPrompt() },
+      }, '休息一下'),
+      h('button', {
+        type: 'button',
+        onClick: () => { state = snooze(state, 10, Date.now()); clearPrompt() },
+      }, '10 分钟后再提醒'),
+      h('button', {
+        type: 'button',
+        onClick: () => { state = muteToday(state, Date.now()); clearPrompt() },
+      }, '今天不再提醒'))))
 }
-
 // ── 专注计时（composer 下方一行）────────────────────────────────────────────
 
 function HealthChip() {
